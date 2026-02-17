@@ -142,17 +142,19 @@ const Studio = () => {
                                 </div>
                             </div>
 
-                            {store.participants.map(p => (
-                                <div key={p.id} className="flex items-center gap-3 p-2 rounded-xl bg-white/[0.02] border border-transparent hover:border-white/5 transition-colors">
-                                    <div className="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center text-[10px] font-bold text-slate-400 uppercase">
-                                        {p.name.slice(0, 2)}
+                            {store.participants
+                                .filter(p => p.id !== store.participantId)
+                                .map(p => (
+                                    <div key={p.id} className="flex items-center gap-3 p-2 rounded-xl bg-white/[0.02] border border-transparent hover:border-white/5 transition-colors">
+                                        <div className="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center text-[10px] font-bold text-slate-400 uppercase">
+                                            {p.name.slice(0, 2)}
+                                        </div>
+                                        <div className="hidden lg:block">
+                                            <p className="text-sm font-bold text-slate-300">{p.name}</p>
+                                            <p className="text-[10px] text-slate-500 font-medium">{p.isRecording ? 'Singing' : 'Listening'}</p>
+                                        </div>
                                     </div>
-                                    <div className="hidden lg:block">
-                                        <p className="text-sm font-bold text-slate-300">{p.name}</p>
-                                        <p className="text-[10px] text-slate-500 font-medium">{p.isRecording ? 'Singing' : 'Listening'}</p>
-                                    </div>
-                                </div>
-                            ))}
+                                ))}
                         </div>
                     </div>
                 </div>

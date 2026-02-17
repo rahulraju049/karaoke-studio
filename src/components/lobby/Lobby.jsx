@@ -8,7 +8,7 @@ const Lobby = () => {
     const [code, setCode] = useState('');
     const [isCreating, setIsCreating] = useState(false);
 
-    const { setUser, setRoomCode } = useStore();
+    const { setUser, setRoomCode, setParticipantId } = useStore();
 
     const handleJoin = async (e) => {
         e.preventDefault();
@@ -58,19 +58,23 @@ const Lobby = () => {
             }
 
             // Add participant
-            const { error: partError } = await supabase
+            const { data: partData, error: partError } = await supabase
                 .from('participants')
                 .insert([{
                     room_id: roomData.id,
                     user_name: name.trim()
-                }]);
+                }])
+                .select('id')
+                .single();
 
-            if (partError) {
+            if (partError || !partData) {
                 console.error("Participant error:", partError);
-                alert(`Failed to join room: ${partError.message}`);
+                alert(`Failed to join room: ${partError?.message || "Unknown error"}`);
                 setIsCreating(false);
                 return;
             }
+
+            setParticipantId(partData.id);
         } else {
             alert("Configuration Error: Missing Supabase keys.");
             setIsCreating(false);
