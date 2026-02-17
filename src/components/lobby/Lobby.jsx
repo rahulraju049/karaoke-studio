@@ -28,11 +28,15 @@ const Lobby = () => {
 
                 if (error) {
                     console.error("Error creating room", error);
+                    alert(`Failed to create room: ${error.message || "Database connection error"}`);
                     setIsCreating(false);
                     return;
                 }
             } else {
-                console.warn("Supabase not available. Creating local-only session.");
+                console.error("Supabase not available.");
+                alert("Configuration Error: App is missing Supabase connection keys. Please check your Vercel Environment Variables.");
+                setIsCreating(false);
+                return;
             }
         }
 
@@ -45,17 +49,30 @@ const Lobby = () => {
                 .single();
 
             if (joinError || !roomData) {
-                alert("Room not found!");
+                console.error("Join error:", joinError);
+                alert(joinError ? `Room error: ${joinError.message}` : "Room not found!");
+                setIsCreating(false);
                 return;
             }
 
             // Add participant
-            await supabase
+            const { error: partError } = await supabase
                 .from('participants')
                 .insert([{
                     room_id: roomData.id,
                     user_name: name.trim()
                 }]);
+
+            if (partError) {
+                console.error("Participant error:", partError);
+                alert(`Failed to join room: ${partError.message}`);
+                setIsCreating(false);
+                return;
+            }
+        } else {
+            alert("Configuration Error: Missing Supabase keys.");
+            setIsCreating(false);
+            return;
         }
 
         setUser(name.trim());
