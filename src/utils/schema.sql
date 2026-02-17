@@ -21,3 +21,13 @@ CREATE TABLE participants (
 -- Enable Realtime for rooms table
 ALTER PUBLICATION supabase_realtime ADD TABLE rooms;
 ALTER PUBLICATION supabase_realtime ADD TABLE participants;
+
+-- Enable Row Level Security
+ALTER TABLE rooms ENABLE ROW LEVEL SECURITY;
+ALTER TABLE participants ENABLE ROW LEVEL SECURITY;
+
+-- Create policies for anonymous access (adjust as needed for security)
+CREATE POLICY "Allow anonymous room creation" ON rooms FOR INSERT WITH CHECK (true);
+CREATE POLICY "Allow anonymous room viewing" ON rooms FOR SELECT USING (true);
+CREATE POLICY "Allow anonymous participant insertion" ON participants FOR INSERT WITH CHECK (true);
+CREATE POLICY "Allow anonymous participant viewing" ON participants FOR SELECT USING (true);
