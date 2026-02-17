@@ -1,15 +1,14 @@
--- VocalFlow Karaoke - Tables Setup
+-- VocalFlow Karaoke - Tables Setup (Idempotent)
 
--- Rooms table to track session state
-CREATE TABLE rooms (
+-- 1. Create Tables
+CREATE TABLE IF NOT EXISTS rooms (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   room_code VARCHAR(6) UNIQUE NOT NULL,
   current_song_status JSONB DEFAULT '{"playing": false, "currentTime": 0, "songName": null}',
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Participants table to track who's in each room
-CREATE TABLE participants (
+CREATE TABLE IF NOT EXISTS participants (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   room_id UUID REFERENCES rooms(id) ON DELETE CASCADE,
   user_name VARCHAR(50) NOT NULL,
@@ -18,15 +17,34 @@ CREATE TABLE participants (
   joined_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Enable Realtime for rooms table
-ALTER PUBLICATION supabase_realtime ADD TABLE rooms;
-ALTER PUBLICATION supabase_realtime ADD TABLE participants;
+-- 2. Enable Realtime
+-- This block ensures publications are set up without errors
+DO $$ 
+BEGIN
+  -- Re-add tables to publication (ignoring errors if already added)
+  BEGIN
+    ALTER PUBLICATION supabase_realtime ADD TABLE rooms;
+  EXCEPTION WHEN others THEN
+    RAISE NOTICE 'Table rooms already in publication';
+  END;
 
--- Enable Row Level Security
+  BEGIN
+    ALTER PUBLICATION supabase_realtime ADD TABLE participants;
+  EXCEPTION WHEN others THEN
+    RAISE NOTICE 'Table participants already in publication';
+  END;
+END $$;
+
+-- 3. Enable RLS
 ALTER TABLE rooms ENABLE ROW LEVEL SECURITY;
 ALTER TABLE participants ENABLE ROW LEVEL SECURITY;
 
--- Create policies for anonymous access (adjust as needed for security)
+-- 4. Create Policies (Idempotent)
+DROP POLICY IF EXISTS "Allow anonymous room creation" ON rooms;
+DROP POLICY IF EXISTS "Allow anonymous room viewing" ON rooms;
+DROP POLICY IF EXISTS "Allow anonymous participant insertion" ON participants;
+DROP POLICY IF EXISTS "Allow anonymous participant viewing" ON participants;
+
 CREATE POLICY "Allow anonymous room creation" ON rooms FOR INSERT WITH CHECK (true);
 CREATE POLICY "Allow anonymous room viewing" ON rooms FOR SELECT USING (true);
 CREATE POLICY "Allow anonymous participant insertion" ON participants FOR INSERT WITH CHECK (true);
