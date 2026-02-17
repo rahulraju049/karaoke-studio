@@ -6,9 +6,72 @@ import MixingConsole from './mixing-console/MixingConsole';
 import Visualizer from './mixing-console/Visualizer';
 import LyricsSystem from './lyrics/LyricsSystem';
 
+import { supabase } from '../utils/supabaseClient';
+
 const Studio = () => {
     const store = useStore();
     const { startMic, loadBackingTrack, togglePlayback, seek, currentTime, duration, analyzer } = useAudioEngine();
+
+    // Fetch and subscribe to participants
+    React.useEffect(() => {
+        if (!store.roomCode || !supabase) return;
+
+        const fetchParticipants = async () => {
+            const { data: roomData } = await supabase
+                .from('rooms')
+                .select('id')
+                .eq('room_code', store.roomCode)
+                .single();
+
+            if (roomData) {
+                const { data: participants } = await supabase
+                    .from('participants')
+                    .select('*')
+                    .eq('room_id', roomData.id);
+
+                if (participants) {
+                    store.setParticipants(participants.map(p => ({
+                        id: p.id,
+                        name: p.user_name,
+                        role: p.role,
+                        isRecording: false // Could be synced later
+                    })));
+                }
+
+                // Subscribe to changes
+                const channel = supabase
+                    .channel(`participants:${roomData.id}`)
+                    .on('postgres_changes', {
+                        event: '*',
+                        schema: 'public',
+                        table: 'participants',
+                        filter: `room_id=eq.${roomData.id}`
+                    }, async () => {
+                        // Re-fetch on any change for simplicity
+                        const { data: updated } = await supabase
+                            .from('participants')
+                            .select('*')
+                            .eq('room_id', roomData.id);
+
+                        if (updated) {
+                            store.setParticipants(updated.map(p => ({
+                                id: p.id,
+                                name: p.user_name,
+                                role: p.role,
+                                isRecording: false
+                            })));
+                        }
+                    })
+                    .subscribe();
+
+                return () => {
+                    supabase.removeChannel(channel);
+                };
+            }
+        };
+
+        fetchParticipants();
+    }, [store.roomCode]);
 
     const handleStartMic = async () => {
         await startMic();

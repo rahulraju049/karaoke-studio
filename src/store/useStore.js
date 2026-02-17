@@ -4,12 +4,10 @@ const useStore = create((set) => ({
     // Lobby & Sync State
     roomCode: null,
     user: null,
-    participants: [
-        { id: '1', name: 'StudioBot', role: 'Producer', isRecording: false },
-        { id: '2', name: 'Vocalist_One', role: 'Artist', isRecording: true },
-    ],
+    participants: [],
     setUser: (name) => set({ user: { name, role: 'Vocalist', isRecording: false } }),
     setRoomCode: (code) => set({ roomCode: code }),
+    setParticipants: (newParticipants) => set({ participants: newParticipants }),
 
     // Audio Engine State
     masterVolume: -10,
