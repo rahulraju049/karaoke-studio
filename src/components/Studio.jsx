@@ -17,19 +17,26 @@ const Studio = () => {
         if (!store.roomCode || !supabase) return;
 
         const fetchParticipants = async () => {
-            const { data: roomData } = await supabase
+            const { data: roomData, error: roomError } = await supabase
                 .from('rooms')
                 .select('id')
                 .eq('room_code', store.roomCode)
                 .single();
 
+            if (roomError) {
+                console.error("Error fetching room:", roomError);
+                return;
+            }
+
             if (roomData) {
-                const { data: participants } = await supabase
+                const { data: participants, error: partError } = await supabase
                     .from('participants')
                     .select('*')
                     .eq('room_id', roomData.id);
 
-                if (participants) {
+                if (partError) {
+                    console.error("Error fetching participants:", partError);
+                } else if (participants) {
                     store.setParticipants(participants.map(p => ({
                         id: p.id,
                         name: p.user_name,
@@ -70,7 +77,10 @@ const Studio = () => {
             }
         };
 
-        fetchParticipants();
+        const cleanupPromise = fetchParticipants();
+        return () => {
+            cleanupPromise.then(cleanup => cleanup && cleanup());
+        };
     }, [store.roomCode]);
 
     const handleStartMic = async () => {

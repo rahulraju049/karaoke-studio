@@ -151,7 +151,7 @@ export const useAudioEngine = () => {
 
         // Update Supabase to notify others
         if (roomCode && supabase) {
-            await supabase
+            const { error } = await supabase
                 .from('rooms')
                 .update({
                     current_song_status: {
@@ -160,6 +160,11 @@ export const useAudioEngine = () => {
                     }
                 })
                 .eq('room_code', roomCode);
+
+            if (error) {
+                console.error("Sync Playback Error:", error);
+                alert(`Sync failed: ${error.message}. Check your database permissions.`);
+            }
         } else {
             // Local only if no room
             if (newState) {
@@ -177,7 +182,7 @@ export const useAudioEngine = () => {
         const isPlaying = playerRef.current.state === "started";
 
         if (roomCode && supabase) {
-            await supabase
+            const { error } = await supabase
                 .from('rooms')
                 .update({
                     current_song_status: {
@@ -186,6 +191,11 @@ export const useAudioEngine = () => {
                     }
                 })
                 .eq('room_code', roomCode);
+
+            if (error) {
+                console.error("Sync Seek Error:", error);
+                alert(`Seek sync failed: ${error.message}`);
+            }
         } else {
             if (isPlaying) {
                 playerRef.current.stop();

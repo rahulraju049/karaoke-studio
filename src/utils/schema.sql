@@ -49,5 +49,9 @@ DROP POLICY IF EXISTS "Allow anonymous participant viewing" ON participants;
 
 CREATE POLICY "Allow anonymous room creation" ON rooms FOR INSERT WITH CHECK (true);
 CREATE POLICY "Allow anonymous room viewing" ON rooms FOR SELECT USING (true);
+CREATE POLICY "Allow anonymous room update" ON rooms FOR UPDATE USING (true);
+
 CREATE POLICY "Allow anonymous participant insertion" ON participants FOR INSERT WITH CHECK (true);
 CREATE POLICY "Allow anonymous participant viewing" ON participants FOR SELECT USING (true);
+CREATE POLICY "Allow anonymous participant update" ON participants FOR UPDATE USING (true);
+CREATE POLICY "Allow anonymous participant delete" ON participants FOR DELETE USING (true);
