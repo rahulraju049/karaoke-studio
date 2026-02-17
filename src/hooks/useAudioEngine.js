@@ -79,18 +79,27 @@ export const useAudioEngine = () => {
                 const { playing, currentTime: newTime } = payload.new.current_song_status;
 
                 if (playerRef.current) {
-                    if (playing) {
-                        // If seeking while playing or starting
-                        const diff = Math.abs(currentTime - newTime);
-                        if (playerRef.current.state !== "started" || diff > 1) {
-                            playerRef.current.start(undefined, newTime);
-                            setIsPlaying(true);
-                        }
-                    } else if (playerRef.current.state === "started") {
+                    // Sync playback state
+                    if (playing && playerRef.current.state !== "started") {
+                        playerRef.current.start(undefined, newTime);
+                        setIsPlaying(true);
+                    } else if (!playing && playerRef.current.state === "started") {
                         playerRef.current.stop();
                         setIsPlaying(false);
                     }
-                    setCurrentTime(newTime);
+
+                    // Sync time if difference is significant (> 1s)
+                    const localTime = playerRef.current.buffer.duration ? playerRef.current.now() - playerRef.current._startTime : 0;
+                    const diff = Math.abs(localTime - newTime);
+
+                    if (playing && diff > 1) {
+                        playerRef.current.stop();
+                        playerRef.current.start(undefined, newTime);
+                    }
+
+                    if (!playing) {
+                        setCurrentTime(newTime);
+                    }
                 }
             })
             .subscribe();
@@ -98,7 +107,7 @@ export const useAudioEngine = () => {
         return () => {
             supabase.removeChannel(channel);
         };
-    }, [roomCode, currentTime]);
+    }, [roomCode]); // Removed currentTime from dependencies!
 
     useEffect(() => {
         if (reverbRef.current) reverbRef.current.wet.value = reverbWet;

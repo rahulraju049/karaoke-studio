@@ -7,6 +7,7 @@ CREATE TABLE IF NOT EXISTS rooms (
   current_song_status JSONB DEFAULT '{"playing": false, "currentTime": 0, "songName": null}',
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+ALTER TABLE rooms REPLICA IDENTITY FULL;
 
 CREATE TABLE IF NOT EXISTS participants (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -16,6 +17,7 @@ CREATE TABLE IF NOT EXISTS participants (
   is_active BOOLEAN DEFAULT TRUE,
   joined_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+ALTER TABLE participants REPLICA IDENTITY FULL;
 
 -- 2. Enable Realtime
 -- This block ensures publications are set up without errors

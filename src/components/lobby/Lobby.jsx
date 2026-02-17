@@ -22,13 +22,15 @@ const Lobby = () => {
             finalRoomCode = Math.random().toString(36).substring(2, 8).toUpperCase();
 
             if (supabase) {
-                const { error } = await supabase
+                const { data: newRoom, error } = await supabase
                     .from('rooms')
-                    .insert([{ room_code: finalRoomCode }]);
+                    .insert([{ room_code: finalRoomCode }])
+                    .select()
+                    .single();
 
-                if (error) {
+                if (error || !newRoom) {
                     console.error("Error creating room", error);
-                    alert(`Failed to create room: ${error.message || "Database connection error"}`);
+                    alert(`Failed to create room: ${error?.message || "Database connection error"}`);
                     setIsCreating(false);
                     return;
                 }
