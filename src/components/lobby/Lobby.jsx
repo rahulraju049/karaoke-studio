@@ -90,6 +90,8 @@ const Lobby = () => {
         joinRoom(name.trim(), finalRoomCode, partData.id);
     };
 
+    const isSupabaseMissing = !supabase;
+
     return (
         <div className="min-h-screen flex items-center justify-center bg-bg-darker p-4">
             <div className="glass-panel w-full max-w-md p-8 rounded-3xl animate-in fade-in zoom-in duration-500">
@@ -102,6 +104,16 @@ const Lobby = () => {
                         <h1 className="text-3xl font-bold tracking-tight text-white">VocalStudio Pro</h1>
                         <p className="text-slate-400">Collaborative Recording & Sync</p>
                     </div>
+
+                    {isSupabaseMissing && (
+                        <div className="w-full bg-red-500/10 border border-red-500/20 rounded-xl p-4 text-left">
+                            <p className="text-red-500 text-xs font-bold uppercase mb-1">⚠️ Connection Error</p>
+                            <p className="text-slate-400 text-[10px] leading-relaxed">
+                                Supabase keys are missing. The app is running in <span className="text-white">Local-Only</span> mode.
+                                Room synchronization will not work. Check your <code className="bg-white/10 px-1 rounded">.env</code> file.
+                            </p>
+                        </div>
+                    )}
 
                     <form onSubmit={handleJoin} className="w-full space-y-4">
                         <div className="relative">

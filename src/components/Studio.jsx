@@ -226,10 +226,14 @@ const Studio = () => {
                 </header>
 
                 {/* Connection Status Bar */}
-                {connectionStatus !== 'connected' && (
-                    <div className={`px-6 py-2 text-center text-xs font-bold uppercase tracking-widest ${connectionStatus === 'initializing' ? 'bg-studio-primary/20 text-studio-primary' : 'bg-red-500/20 text-red-500'
+                {(connectionStatus !== 'connected' || !supabase) && (
+                    <div className={`px-6 py-2 text-center text-xs font-bold uppercase tracking-widest ${(!supabase || connectionStatus === 'error') ? 'bg-red-500/20 text-red-500' : 'bg-studio-primary/20 text-studio-primary'
                         }`}>
-                        {connectionStatus === 'initializing' ? '📡 Establishing Real-time Connection...' : '⚠️ Connection Failed. Check your Internet or Supabase Config.'}
+                        {!supabase
+                            ? '⚠️ Connection Error: Missing Supabase Keys (Running Local-Only)'
+                            : connectionStatus === 'initializing'
+                                ? '📡 Establishing Real-time Connection...'
+                                : '⚠️ Connection Failed. Check your Internet or Supabase Config.'}
                     </div>
                 )}
 
