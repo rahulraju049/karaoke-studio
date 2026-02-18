@@ -14,86 +14,102 @@ const Studio = () => {
     const [connectionStatus, setConnectionStatus] = React.useState('initializing');
 
     // Fetch and subscribe to participants
-    React.useEffect(() => {
+    const [retryCount, setRetryCount] = React.useState(0);
+    const [diagnosticLogs, setDiagnosticLogs] = React.useState([]);
+
+    const addLog = (msg) => {
+        setDiagnosticLogs(prev => [
+            { id: Date.now(), time: new Date().toLocaleTimeString(), msg },
+            ...prev
+        ].slice(0, 5));
+    };
+
+    const initializeSync = React.useCallback(async () => {
         if (!store.roomCode || !supabase) {
-            console.warn("Studio Blocked: Missing roomCode or Supabase client", { roomCode: store.roomCode, hasSupabase: !!supabase });
+            addLog("⚠️ Blocked: Missing roomCode or Supabase");
             return;
         }
 
-        console.log("📡 Studio Initializing Sync for Room:", store.roomCode);
+        addLog(`📡 Initializing Sync: ${store.roomCode}`);
+        setConnectionStatus('initializing');
 
-        let channel;
+        try {
+            // 1. Get internal room ID from code
+            const { data: roomData, error: roomError } = await supabase
+                .from('rooms')
+                .select('id')
+                .eq('room_code', store.roomCode)
+                .single();
 
-        const initializeSync = async () => {
-            try {
-                // 1. Get internal room ID from code
-                const { data: roomData, error: roomError } = await supabase
-                    .from('rooms')
-                    .select('id')
-                    .eq('room_code', store.roomCode)
-                    .single();
-
-                if (roomError || !roomData) {
-                    console.error("❌ Room Resolution Error:", roomError || "Room not found");
-                    return;
-                }
-
-                console.log("✅ Room Resolved - ID:", roomData.id);
-
-                // 2. Initial Fetch
-                const fetchParticipants = async () => {
-                    const { data: participants, error: partError } = await supabase
-                        .from('participants')
-                        .select('*')
-                        .eq('room_id', roomData.id);
-
-                    if (partError) {
-                        console.error("❌ Participants Fetch Error:", partError);
-                    } else {
-                        console.log("👥 Participants Loaded:", participants?.length || 0, participants);
-                        store.setParticipants(participants.map(p => ({
-                            id: p.id,
-                            name: p.user_name,
-                            role: p.role,
-                            isRecording: p.is_recording
-                        })));
-                    }
-                };
-
-                await fetchParticipants();
-
-                // 3. Subscribe to Realtime Changes
-                channel = supabase
-                    .channel(`participants:${roomData.id}`)
-                    .on('postgres_changes', {
-                        event: '*',
-                        schema: 'public',
-                        table: 'participants',
-                        filter: `room_id=eq.${roomData.id}`
-                    }, (payload) => {
-                        console.log("⚡ Participant Event Received:", payload.eventType, payload.new || payload.old);
-                        fetchParticipants(); // Refresh on any change
-                    })
-                    .subscribe((status) => {
-                        console.log(`🔌 Subscription Status [${roomData.id}]:`, status);
-                        setConnectionStatus(status === 'SUBSCRIBED' ? 'connected' : 'error');
-                    });
-
-            } catch (err) {
-                console.error("🔥 Studio Sync Critical Error:", err);
+            if (roomError || !roomData) {
+                addLog(`❌ Room Resolution Error: ${roomError?.message || "Not found"}`);
                 setConnectionStatus('error');
+                return;
             }
+
+            addLog(`✅ Room Resolved: ${roomData.id}`);
+
+            // 2. Initial Fetch
+            const fetchParticipants = async () => {
+                const { data: participants, error: partError } = await supabase
+                    .from('participants')
+                    .select('id, user_name, role, is_recording')
+                    .eq('room_id', roomData.id);
+
+                if (partError) {
+                    addLog(`❌ Fetch Error: ${partError.message}`);
+                } else {
+                    addLog(`👥 Sync: ${participants?.length || 0} peers`);
+                    store.setParticipants(participants.map(p => ({
+                        id: p.id,
+                        name: p.user_name,
+                        role: p.role,
+                        isRecording: p.is_recording
+                    })));
+                }
+            };
+
+            await fetchParticipants();
+
+            // 3. Subscribe to Realtime Changes
+            const channel = supabase
+                .channel(`participants:${roomData.id}`)
+                .on('postgres_changes', {
+                    event: '*',
+                    schema: 'public',
+                    table: 'participants',
+                    filter: `room_id=eq.${roomData.id}`
+                }, (payload) => {
+                    addLog(`⚡ Event: ${payload.eventType}`);
+                    fetchParticipants();
+                })
+                .subscribe((status) => {
+                    addLog(`🔌 Status: ${status}`);
+                    setConnectionStatus(status === 'SUBSCRIBED' ? 'connected' : status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' ? 'error' : 'connecting');
+                });
+
+            return channel;
+        } catch (err) {
+            addLog(`🔥 Critical Error: ${err.message}`);
+            setConnectionStatus('error');
+        }
+    }, [store.roomCode, retryCount]);
+
+    React.useEffect(() => {
+        let channel;
+        const runInitialization = async () => {
+            channel = await initializeSync();
         };
 
-        initializeSync();
+        runInitialization();
 
         return () => {
             if (channel) {
-                console.log("🔌 Cleaning up Studio Subscriptions");
+                addLog("🔌 Cleaning up channel");
                 supabase.removeChannel(channel);
             }
         };
-    }, [store.roomCode]);
+    }, [initializeSync]);
 
     const handleStartMic = async () => {
         await startMic();
@@ -124,6 +140,16 @@ const Studio = () => {
     const copyRoomCode = () => {
         navigator.clipboard.writeText(store.roomCode);
         alert("Room Code copied!");
+    };
+
+    const handleLeave = async () => {
+        if (supabase && store.participantId) {
+            await supabase
+                .from('participants')
+                .delete()
+                .eq('id', store.participantId);
+        }
+        window.location.reload();
     };
 
     return (
@@ -183,9 +209,12 @@ const Studio = () => {
                             </button>
                         </div>
                     </div>
-                    <button className="w-full bg-studio-primary/20 hover:bg-studio-primary/30 text-studio-primary rounded-xl py-3 px-4 flex items-center justify-center gap-2 transition-all group border border-studio-primary/30">
-                        <Share2 size={18} className="group-hover:text-studio-accent transition-colors" />
-                        <span className="hidden lg:block text-sm font-bold">Invite Peers</span>
+                    <button
+                        onClick={handleLeave}
+                        className="w-full bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-xl py-3 px-4 flex items-center justify-center gap-2 transition-all group border border-red-500/20"
+                    >
+                        <Settings size={18} className="rotate-90" />
+                        <span className="hidden lg:block text-sm font-bold">Leave Studio</span>
                     </button>
                 </div>
             </aside>
@@ -227,13 +256,33 @@ const Studio = () => {
 
                 {/* Connection Status Bar */}
                 {(connectionStatus !== 'connected' || !supabase) && (
-                    <div className={`px-6 py-2 text-center text-xs font-bold uppercase tracking-widest ${(!supabase || connectionStatus === 'error') ? 'bg-red-500/20 text-red-500' : 'bg-studio-primary/20 text-studio-primary'
+                    <div className={`px-6 py-2 flex items-center justify-between text-[10px] font-bold uppercase tracking-widest ${(!supabase || connectionStatus === 'error') ? 'bg-red-500/20 text-red-500 whitespace-nowrap overflow-x-auto' : 'bg-studio-primary/20 text-studio-primary'
                         }`}>
-                        {!supabase
-                            ? '⚠️ Connection Error: Missing Supabase Keys (Running Local-Only)'
-                            : connectionStatus === 'initializing'
-                                ? '📡 Establishing Real-time Connection...'
-                                : '⚠️ Connection Failed. Check your Internet or Supabase Config.'}
+                        <div className="flex items-center gap-4">
+                            {!supabase
+                                ? '⚠️ Connection Error: Missing Supabase Keys (Running Local-Only)'
+                                : connectionStatus === 'initializing'
+                                    ? '📡 Establishing Real-time Connection...'
+                                    : connectionStatus === 'error'
+                                        ? '⚠️ Connection Failed. Check your Internet or Supabase Config.'
+                                        : `📡 Status: ${connectionStatus}...`}
+
+                            {supabase && connectionStatus === 'error' && (
+                                <button
+                                    onClick={() => setRetryCount(prev => prev + 1)}
+                                    className="px-3 py-1 bg-red-500 text-white rounded-md hover:bg-red-600 transition-colors ml-2 normal-case tracking-normal"
+                                >
+                                    Retry Connection
+                                </button>
+                            )}
+                        </div>
+
+                        {/* Recent Diagnostic Logs */}
+                        <div className="hidden lg:flex items-center gap-4 opacity-50">
+                            {diagnosticLogs.slice(0, 1).map(log => (
+                                <span key={log.id} className="font-mono">[{log.time}] {log.msg}</span>
+                            ))}
+                        </div>
                     </div>
                 )}
 

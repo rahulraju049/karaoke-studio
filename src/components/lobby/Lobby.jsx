@@ -106,11 +106,15 @@ const Lobby = () => {
                     </div>
 
                     {isSupabaseMissing && (
-                        <div className="w-full bg-red-500/10 border border-red-500/20 rounded-xl p-4 text-left">
-                            <p className="text-red-500 text-xs font-bold uppercase mb-1">⚠️ Connection Error</p>
+                        <div className="w-full bg-red-500/10 border border-red-500/20 rounded-xl p-4 text-left animate-pulse">
+                            <p className="text-red-500 text-xs font-black uppercase mb-1 flex items-center gap-2">
+                                <span className="w-2 h-2 rounded-full bg-red-500" />
+                                ⚠️ Connection Error
+                            </p>
                             <p className="text-slate-400 text-[10px] leading-relaxed">
-                                Supabase keys are missing. The app is running in <span className="text-white">Local-Only</span> mode.
-                                Room synchronization will not work. Check your <code className="bg-white/10 px-1 rounded">.env</code> file.
+                                VocalFlow cannot connect to the backend. Sync and Rooms are disabled.
+                                <br />
+                                <span className="text-white/60">Reason: Missing Supabase Environment Variables.</span>
                             </p>
                         </div>
                     )}
