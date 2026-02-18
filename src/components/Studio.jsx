@@ -11,6 +11,7 @@ import { supabase } from '../utils/supabaseClient';
 const Studio = () => {
     const store = useStore();
     const { startMic, loadBackingTrack, togglePlayback, seek, currentTime, duration, analyzer } = useAudioEngine();
+    const [connectionStatus, setConnectionStatus] = React.useState('initializing');
 
     // Fetch and subscribe to participants
     React.useEffect(() => {
@@ -75,10 +76,12 @@ const Studio = () => {
                     })
                     .subscribe((status) => {
                         console.log(`🔌 Subscription Status [${roomData.id}]:`, status);
+                        setConnectionStatus(status === 'SUBSCRIBED' ? 'connected' : 'error');
                     });
 
             } catch (err) {
                 console.error("🔥 Studio Sync Critical Error:", err);
+                setConnectionStatus('error');
             }
         };
 
@@ -221,6 +224,14 @@ const Studio = () => {
                         </button>
                     </div>
                 </header>
+
+                {/* Connection Status Bar */}
+                {connectionStatus !== 'connected' && (
+                    <div className={`px-6 py-2 text-center text-xs font-bold uppercase tracking-widest ${connectionStatus === 'initializing' ? 'bg-studio-primary/20 text-studio-primary' : 'bg-red-500/20 text-red-500'
+                        }`}>
+                        {connectionStatus === 'initializing' ? '📡 Establishing Real-time Connection...' : '⚠️ Connection Failed. Check your Internet or Supabase Config.'}
+                    </div>
+                )}
 
                 {/* Studio Body */}
                 <div className="flex-1 overflow-hidden flex flex-col p-6 lg:p-10 space-y-8">
