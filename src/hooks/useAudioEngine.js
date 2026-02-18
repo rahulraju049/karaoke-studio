@@ -15,6 +15,7 @@ export const useAudioEngine = () => {
         eqMid,
         eqHigh,
         roomCode,
+        participantId,
         setIsPlaying
     } = useStore();
 
@@ -92,9 +93,9 @@ export const useAudioEngine = () => {
                     const localTime = playerRef.current.buffer.duration ? playerRef.current.now() - playerRef.current._startTime : 0;
                     const diff = Math.abs(localTime - newTime);
 
-                    if (playing && diff > 1) {
+                    if (playing && diff > 0.5) { // Tightened sync threshold
                         playerRef.current.stop();
-                        playerRef.current.start(undefined, newTime);
+                        playerRef.current.start(Tone.now(), newTime); // Using Tone.now() for more precise scheduling
                     }
 
                     if (!playing) {
@@ -128,11 +129,35 @@ export const useAudioEngine = () => {
             try {
                 await micRef.current.open();
                 micRef.current.connect(pitchShiftRef.current);
+
+                // Sync recording state to Supabase
+                if (roomCode && participantId && supabase) {
+                    await supabase
+                        .from('participants')
+                        .update({ is_recording: true })
+                        .eq('id', participantId);
+                }
             } catch (e) {
                 console.error("Mic access denied", e);
             }
         }
     };
+
+    // Effect to clean up mic state on unmount
+    useEffect(() => {
+        return () => {
+            if (roomCode && participantId && supabase) {
+                // Non-blocking update on cleanup
+                supabase
+                    .from('participants')
+                    .update({ is_recording: false })
+                    .eq('id', participantId)
+                    .then(({ error }) => {
+                        if (error) console.error("Error clearing mic state on unmount:", error);
+                    });
+            }
+        };
+    }, [roomCode, participantId]);
 
     const loadBackingTrack = async (blobUrl) => {
         if (playerRef.current) playerRef.current.dispose();

@@ -36,6 +36,12 @@ const useStore = create((set) => ({
     setReverbWet: (val) => set({ reverbWet: val }),
     setDelayWet: (val) => set({ delayWet: val }),
     setEq: (band, val) => set((state) => ({ [`eq${band}`]: val })),
+    // Batched actions
+    joinRoom: (name, code, partId) => set({
+        user: { name, role: 'Vocalist', isRecording: false },
+        roomCode: code,
+        participantId: partId
+    }),
 }));
 
 export default useStore;

@@ -8,7 +8,7 @@ const Lobby = () => {
     const [code, setCode] = useState('');
     const [isCreating, setIsCreating] = useState(false);
 
-    const { setUser, setRoomCode, setParticipantId } = useStore();
+    const { joinRoom } = useStore();
 
     const handleJoin = async (e) => {
         e.preventDefault();
@@ -81,8 +81,13 @@ const Lobby = () => {
             return;
         }
 
-        setUser(name.trim());
-        setRoomCode(finalRoomCode);
+        console.log("🚀 Connection Success!", {
+            userName: name.trim(),
+            roomCode: finalRoomCode,
+            participantId: partData.id
+        });
+
+        joinRoom(name.trim(), finalRoomCode, partData.id);
     };
 
     return (

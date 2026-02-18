@@ -14,72 +14,81 @@ const Studio = () => {
 
     // Fetch and subscribe to participants
     React.useEffect(() => {
-        if (!store.roomCode || !supabase) return;
+        if (!store.roomCode || !supabase) {
+            console.warn("Studio Blocked: Missing roomCode or Supabase client", { roomCode: store.roomCode, hasSupabase: !!supabase });
+            return;
+        }
 
-        const fetchParticipants = async () => {
-            const { data: roomData, error: roomError } = await supabase
-                .from('rooms')
-                .select('id')
-                .eq('room_code', store.roomCode)
-                .single();
+        console.log("📡 Studio Initializing Sync for Room:", store.roomCode);
 
-            if (roomError) {
-                console.error("Error fetching room:", roomError);
-                return;
-            }
+        let channel;
 
-            if (roomData) {
-                const { data: participants, error: partError } = await supabase
-                    .from('participants')
-                    .select('*')
-                    .eq('room_id', roomData.id);
+        const initializeSync = async () => {
+            try {
+                // 1. Get internal room ID from code
+                const { data: roomData, error: roomError } = await supabase
+                    .from('rooms')
+                    .select('id')
+                    .eq('room_code', store.roomCode)
+                    .single();
 
-                if (partError) {
-                    console.error("Error fetching participants:", partError);
-                } else if (participants) {
-                    store.setParticipants(participants.map(p => ({
-                        id: p.id,
-                        name: p.user_name,
-                        role: p.role,
-                        isRecording: false // Could be synced later
-                    })));
+                if (roomError || !roomData) {
+                    console.error("❌ Room Resolution Error:", roomError || "Room not found");
+                    return;
                 }
 
-                // Subscribe to changes
-                const channel = supabase
+                console.log("✅ Room Resolved - ID:", roomData.id);
+
+                // 2. Initial Fetch
+                const fetchParticipants = async () => {
+                    const { data: participants, error: partError } = await supabase
+                        .from('participants')
+                        .select('*')
+                        .eq('room_id', roomData.id);
+
+                    if (partError) {
+                        console.error("❌ Participants Fetch Error:", partError);
+                    } else {
+                        console.log("👥 Participants Loaded:", participants?.length || 0, participants);
+                        store.setParticipants(participants.map(p => ({
+                            id: p.id,
+                            name: p.user_name,
+                            role: p.role,
+                            isRecording: p.is_recording
+                        })));
+                    }
+                };
+
+                await fetchParticipants();
+
+                // 3. Subscribe to Realtime Changes
+                channel = supabase
                     .channel(`participants:${roomData.id}`)
                     .on('postgres_changes', {
                         event: '*',
                         schema: 'public',
                         table: 'participants',
                         filter: `room_id=eq.${roomData.id}`
-                    }, async () => {
-                        // Re-fetch on any change for simplicity
-                        const { data: updated } = await supabase
-                            .from('participants')
-                            .select('*')
-                            .eq('room_id', roomData.id);
-
-                        if (updated) {
-                            store.setParticipants(updated.map(p => ({
-                                id: p.id,
-                                name: p.user_name,
-                                role: p.role,
-                                isRecording: false
-                            })));
-                        }
+                    }, (payload) => {
+                        console.log("⚡ Participant Event Received:", payload.eventType, payload.new || payload.old);
+                        fetchParticipants(); // Refresh on any change
                     })
-                    .subscribe();
+                    .subscribe((status) => {
+                        console.log(`🔌 Subscription Status [${roomData.id}]:`, status);
+                    });
 
-                return () => {
-                    supabase.removeChannel(channel);
-                };
+            } catch (err) {
+                console.error("🔥 Studio Sync Critical Error:", err);
             }
         };
 
-        const cleanupPromise = fetchParticipants();
+        initializeSync();
+
         return () => {
-            cleanupPromise.then(cleanup => cleanup && cleanup());
+            if (channel) {
+                console.log("🔌 Cleaning up Studio Subscriptions");
+                supabase.removeChannel(channel);
+            }
         };
     }, [store.roomCode]);
 
@@ -138,7 +147,9 @@ const Studio = () => {
                                 </div>
                                 <div className="hidden lg:block min-w-0">
                                     <p className="text-sm font-bold text-white truncate">{store.user?.name} (You)</p>
-                                    <p className="text-[10px] text-studio-primary font-medium animate-pulse">Monitoring</p>
+                                    <p className={`text-[10px] font-medium ${store.isMicEnabled ? 'text-studio-accent animate-pulse' : 'text-slate-500'}`}>
+                                        {store.isMicEnabled ? 'Singing Live' : 'Monitoring'}
+                                    </p>
                                 </div>
                             </div>
 
