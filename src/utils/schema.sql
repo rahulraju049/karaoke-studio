@@ -45,8 +45,11 @@ ALTER TABLE participants ENABLE ROW LEVEL SECURITY;
 -- 4. Create Policies (Idempotent)
 DROP POLICY IF EXISTS "Allow anonymous room creation" ON rooms;
 DROP POLICY IF EXISTS "Allow anonymous room viewing" ON rooms;
+DROP POLICY IF EXISTS "Allow anonymous room update" ON rooms;
 DROP POLICY IF EXISTS "Allow anonymous participant insertion" ON participants;
 DROP POLICY IF EXISTS "Allow anonymous participant viewing" ON participants;
+DROP POLICY IF EXISTS "Allow anonymous participant update" ON participants;
+DROP POLICY IF EXISTS "Allow anonymous participant delete" ON participants;
 
 CREATE POLICY "Allow anonymous room creation" ON rooms FOR INSERT WITH CHECK (true);
 CREATE POLICY "Allow anonymous room viewing" ON rooms FOR SELECT USING (true);
